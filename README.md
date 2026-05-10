@@ -26,16 +26,17 @@ Read the instructions **carefully** and follow them step by step.
 ## Studying Guide
 
 <table width="100%">
-<tr><th>#</th><th>Topic</th><th>Tutorial</th><th colspan="3">&nbsp;&nbsp;&nbsp;Resources&nbsp;&nbsp;&nbsp;</th><th>Project</th><th>Recording</th></tr>
+<tr><th>#</th><th>Topic</th><th>Tutorial</th><th colspan="3">&nbsp;&nbsp;&nbsp;Resources&nbsp;&nbsp;&nbsp;</th><th>Recording</th></tr>
+
+
 
 
 <tr>
  <td>1</td>
  <td>Intro</td>
- <td>Intro to microservices</td>
- <td><a target="_blank" href="https://alonitac.github.io/Microservices23/slides/microservices_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
- <td></td>
- <td></td>
+ <td>Intro to cloud computing</td>
+ <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/slides/aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
+ <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/multichoice-questions/aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/qm.png" /></a></td>
  <td></td>
  <td></td>
 </tr>			
@@ -43,13 +44,14 @@ Read the instructions **carefully** and follow them step by step.
 <tr>
  <td>2</td>
  <td>Intro</td>
- <td>Intro to cloud computing</td>
- <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/slides/aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
+ <td><a href="tutorials/docker_containers.md">Intro to containers</a></td>
+ <td><a target="_blank" href="https://alonitac.github.io/Microservices23/slides/containers_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
  <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/multichoice-questions/aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/qm.png" /></a></td>
- <td></td>
- <td></td>
+ <td><a href="tutorials/docker_containers.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
  <td></td>
 </tr>			
+
+
 
 
 </table>
