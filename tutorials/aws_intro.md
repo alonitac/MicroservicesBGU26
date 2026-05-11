@@ -64,15 +64,19 @@ It allows users to create and manage virtual machines, commonly referred to as "
    2. For **Subnet** choose any subnet you want. 
    3. Choose **Create security group** while providing a name other than `launch-wizard-x`. 
 
-8. Keep the default selections for the other configuration settings for your instance\.
 
-9. Review a summary of your instance configuration in the **Summary** panel, and when you're ready, choose **Launch instance**\.
+8. Under **Configure storage**, set the root volume size to **15 GiB**\.
 
-10. A confirmation page lets you know that your instance is launching\. Choose **View all instances** to close the confirmation page and return to the console\.
 
-11. On the **Instances** screen, you can view the status of the launch\. It takes a short time for an instance to launch\. When you launch an instance, its initial state is `pending`\. After the instance starts, its state changes to `running` and it receives a public DNS name\.
+9. Keep the default selections for the other configuration settings for your instance\.
 
-12. It can take a few minutes for the instance to be ready for you to connect to it\. Check that your instance has passed its status checks; you can view this information in the **Status check** column\.
+10. Review a summary of your instance configuration in the **Summary** panel, and when you're ready, choose **Launch instance**\.
+
+11. A confirmation page lets you know that your instance is launching\. Choose **View all instances** to close the confirmation page and return to the console\.
+
+12. On the **Instances** screen, you can view the status of the launch\. It takes a short time for an instance to launch\. When you launch an instance, its initial state is `pending`\. After the instance starts, its state changes to `running` and it receives a public DNS name\.
+
+13. It can take a few minutes for the instance to be ready for you to connect to it\. Check that your instance has passed its status checks; you can view this information in the **Status check** column\.
 
 > [!NOTE]
 > When stopping the instance, please note that the public IP address may change, while the private IP address remains unchanged
