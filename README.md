@@ -40,7 +40,7 @@ Read the instructions **carefully** and follow them step by step.
 <tr>
  <td>1</td>
  <td>Intro</td>
- <td>Intro to cloud computing</td>
+ <td><a href="tutorials/aws_intro.md">Intro to cloud computing</a></td>
  <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/slides/bgu_aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
  <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/multichoice-questions/bgu_aws_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/qm.png" /></a></td>
  <td></td>
