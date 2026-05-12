@@ -45,7 +45,7 @@ Read the instructions **carefully** and follow them step by step.
  <td>2</td>
  <td>Containers</td>
  <td><a href="tutorials/docker_yoloservice.md">Docker containers</a></td>
- <td><a target="_blank" href="https://alonitac.github.io/Microservices23/slides/bgu_docker_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
+ <td><a target="_blank" href="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/slides/bgu_docker_intro.html"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/slides.png" /></a></td>
  <td></td>
  <td><a href="tutorials/docker_yoloservice.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
  <td></td>
