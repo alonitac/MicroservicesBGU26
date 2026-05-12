@@ -22,6 +22,12 @@ Please follow the [onboarding guide](tutorials/onboarding.md) to get started. It
 
 Read the instructions **carefully** and follow them step by step.
 
+## AWS access
+
+- **AWS Console URL**: https://228281126655.signin.aws.amazon.com/console
+
+- **IAM username:** your university email address
+- **Password:** will be given in class
 
 ## Studying Guide
 
