@@ -59,8 +59,15 @@ The final network architecture looks like the following - you will create two cu
 
 #### Notes
 
-- Source code for the YoloService: https://github.com/alonitac/YoloService
-- Source code for the YoloFrontend: https://github.com/alonitac/YoloFrontend. You should create a Dockerfile for it (get help from ChatGPT if you need). Then build and push the image to DockerHub, just like you did for YoloService.
+- Source code for the YoloService is https://github.com/alonitac/YoloService. **Important** - You should fetch new changes from the repo (run `git pull` from the `YoloService` directory) and rebuild the image to get the YoloFrontend talks with YoloService.
+- Source code for the YoloFrontend can be found at https://github.com/alonitac/YoloFrontend. You should clone the repository into your virtual machine: 
+
+```bash
+cd ~
+git clone https://github.com/alonitac/YoloFrontend
+```
+
+Then, create a `Dockerfile` for it (get help from ChatGPT if you need). Then build and push the image to DockerHub, just like you did for YoloService image.
 
 - Grafana should persist data in `/var/lib/grafana`, so you should mount a volume for it. - Prometheus should also persist data in `/prometheus` and read its config from `./prometheus.yml`, so you should mount two volumes for it.
 
