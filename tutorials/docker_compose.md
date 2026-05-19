@@ -67,6 +67,7 @@ The final network architecture looks like the following - you will create two cu
 
 - Source code for the YoloService is https://github.com/alonitac/YoloService. **Important** - You should fetch new changes from the repo (run `git reset --hard origin/main` from the `YoloService` directory) and rebuild the image to get the YoloFrontend talking with YoloService.
 - You've already cloned and built the `yolo-frontend` image in the previous exercise - reuse it here.
+- **Alternatively**, you can use the `alonithuji/yolo-frontend:0.0.2` for the frontend, and `alonithuji/yolo-service:0.0.2` for the backend, which are available on DockerHub.
 - `yolo-frontend` and `yolo-service` should both be attached to `yolo-net`. The frontend container should reach the backend using the `yolo-service` hostname by setting the `YOLO_API_URL` environment variable to `http://yolo-service:8080`.
 - Both grafana and prometheus should persist data, as done in the previous exercise.
 
