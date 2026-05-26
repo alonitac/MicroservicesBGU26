@@ -441,71 +441,159 @@ Instead of accessing your service by its IP address, you can simply use the Serv
 curl yolo-svc:8080
 ```
 
+## ConfigMap
+
+A **ConfigMap** is a mechanism for storing non-sensitive configuration data in key-value pairs.
+ConfigMaps provide a convenient way to inject configuration settings into applications, allowing for easy changes without modifying the container image or rebuilding it.
+
+ConfigMaps can be consumed as **environment variables** or **mounted as files** within Pods.
+
+### Mounting a ConfigMap as a file
+
+In the Docker tutorial, you ran Prometheus by manually creating a `prometheus.yml` file on the host and bind-mounting it into the container with `-v`.
+On Kubernetes, the equivalent is to store the configuration in a ConfigMap and mount it as a file inside the Pod.
+
+Here is the Prometheus scrape configuration as a ConfigMap:
+
+```yaml
+# k8s/configmap-demo.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  # "file-like" key - the "|" in YAML allows multi-line values
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+
+    scrape_configs:
+      - job_name: 'yolo-service'
+        static_configs:
+          - targets: ['yolo-svc:8080']
+```
+
+Notice that unlike in Docker (where you needed the container IP), here you can use the Service DNS name `yolo-svc` directly - CoreDNS resolves it within the cluster.
+
+After applying the ConfigMap, mount it into the Prometheus Deployment:
+
+```yaml
+# k8s/deployment-demo-configmap-mount.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+          - name: prometheus-config
+            mountPath: /etc/prometheus/
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+```
+
+The `volumes` field declares a volume backed by the `prometheus-config` ConfigMap.
+The `volumeMounts` field mounts that volume into `/etc/prometheus/` inside the container - the same path Prometheus reads its config file from by default.
+
+Apply both manifests and exec into the Prometheus pod to confirm the file was mounted:
+
+```bash
+kubectl exec -it <prometheus-pod-name> -- cat /etc/prometheus/prometheus.yml
+```
+
+ConfigMaps can also be consumed as **environment variables**, similarly to how you set `CONFIDENCE_THRESHOLD` in the Docker tutorial - useful for simple key-value settings that don't require a config file.
+
 ## Kubernetes core objects summary
 
 ![][k8s_core_objects]
 
-# Exercises 
+# Exercises
 
-**Note**: To be done in the order of appearance.
+### :pencil2: Deploy the YoloService
 
-### :pencil2: Deploy the 2048 game
+Deploy the YoloService object-detection API you already know from the Docker tutorials - this time on Kubernetes.
 
-Create a `Deployment` for the 2048 game. You can either push the image you've built in the previous exercise to an ECR and use it, or use an [existed image from DockerHub](https://hub.docker.com/r/evilroot/docker-2048) (the container listens on port 80).
-Expose the Deployment with a `Service` listening on port `8080`.
-Visit the app locally using `kubectl port-forward` command. E.g.:
+1. Create a `Deployment` named `yolo-service` based on the [`alonithuji/yolo-service:0.0.2`](https://hub.docker.com/r/alonithuji/yolo-service) image. The container listens on port `8080`. Run **2 replicas**.
+2. Expose it with a `Service` named `yolo-svc` on port `8080`.
+3. Verify the pods are running and the service has endpoints:
+   ```bash
+   kubectl get pods -l app=yolo-service
+   kubectl describe svc yolo-svc
+   ```
+4. Forward the service to your local machine and send a test prediction request:
+   ```bash
+   kubectl port-forward service/yolo-svc 8080:8080 --address 0.0.0.0
+   ```
+   Then in another terminal:
+   ```bash
+   curl -X POST -F "file=@beatles.jpeg" http://<control-plane-ip>:8080/predict
+   ```
 
-```bash
-kubectl port-forward service/YOUR_SERVICE_NAME 8080:8080 --address 0.0.0.0
-```
+### :pencil2: Deploy the YoloFrontend
 
-### :pencil2: Deploy the "Netflix Service"
+In this exercise you add the [YoloFrontend](https://hub.docker.com/r/alonithuji/yolo-frontend) web UI to your cluster and connect it to the backend.
 
-In this exercise you deploy the [NetflixMovieCatalog][NetflixMovieCatalog] and the [NetflixFrontend][NetflixFrontend] microservices. 
+1. Create a `Deployment` named `yolo-frontend` based on the [`alonithuji/yolo-frontend:0.0.2`](https://hub.docker.com/r/alonithuji/yolo-frontend) image. The container listens on port `3000`.  
+   The frontend discovers the backend via the `YOLO_API_URL` environment variable - set it to `http://yolo-svc:8080` (the Service DNS name from the previous exercise).
+2. Expose it with a `Service` named `yolo-frontend-svc` on port `3000`.
+3. Forward the frontend service and open it in your browser:
+   ```bash
+   kubectl port-forward service/yolo-frontend-svc 3000:3000 --address 0.0.0.0
+   ```
+   Open `http://<your-control-plane-ip>:3000` and upload an image - you should see the detection results returned by the backend.
 
-![][k8s_netflix_simple]
+### :pencil2: Deploy the Monitoring Stack
 
+In this exercise you deploy [Prometheus](https://prometheus.io/) and [Grafana](https://grafana.com/) to monitor the YoloService, exactly as you did in the Docker tutorial - but now as Kubernetes `Deployment`s.
 
-1. Fork and clone both repos locally, open in your preferred IDE.
-2. Build a Docker image out of them (you have to create and implement a `Dockerfile` in the root directory of the repo, solution `Dockerfile` in the `dockerfile` Git branch)
-3. [Push your images to a DockerHub](https://docs.docker.com/get-started/introduction/build-and-push-first-image/) public registry. 
-2. Create the following `Deployment`s and the corresponding `Service`s for them:
-   - `netflix-movie-catalog` - listens on port `8080`, running in 2 replicas.
-   - `netflix-frontend` - listens on port `3000`. In order for the app to fetch movies data, should be provided with an environment variable named `MOVIE_CATALOG_SERVICE` which is the address of the `netflix-movie-catalog` service. 
-3. Visit the app locally using `kubectl port-forward` command. E.g.:
+> [!NOTE]
+> In production, both Prometheus and Grafana benefit from persistent storage so that metrics and dashboards survive pod restarts. Persistent volumes and StatefulSets will be covered in a later session. For now, plain `Deployment`s are sufficient.
 
-```bash
-kubectl port-forward service/YOUR_NETFLIX_FRONTEND_SERVICE_NAME 3000:3000 --address 0.0.0.0
-```
+#### Prometheus
 
-Open your web browser and enter `http://<controle-plane-ip>:3000`. 
+1. Create a `ConfigMap` named `prometheus-config` that holds the `prometheus.yml` scrape configuration targeting `yolo-svc:8080` (as shown in the ConfigMap tutorial section above).
+2. Create a `Deployment` named `prometheus` based on the [`prom/prometheus`](https://hub.docker.com/r/prom/prometheus) image, with the ConfigMap mounted at `/etc/prometheus/`. The container listens on port `9090`.
+3. Expose it with a `Service` named `prometheus-svc` on port `9090`.
+4. Forward the service and verify Prometheus is scraping the YoloService:
+   ```bash
+   kubectl port-forward service/prometheus-svc 9090:9090 --address 0.0.0.0
+   ```
+   Open `http://<your-control-plane-ip>:9090` → **Status → Targets** - the `yolo-service` job should be listed as **UP**.
 
-**You should see the Netflix app with movies info and thumbnails.** 
+#### Grafana
 
-### :pencil2: Add Redis to your Netflix service
+5. Create a `Deployment` named `grafana` based on the [`grafana/grafana`](https://hub.docker.com/r/grafana/grafana) image. The container listens on port `3000`. Set the following environment variables:
+   - `GF_AUTH_BASIC_ENABLED=true`
+   - `GF_SECURITY_ADMIN_USER` - your choice
+   - `GF_SECURITY_ADMIN_PASSWORD` - your choice
+6. Expose it with a `Service` named `grafana-svc` on port `3000`.
+7. Forward the Grafana service and open it in your browser:
+   ```bash
+   kubectl port-forward service/grafana-svc 3000:3000 --address 0.0.0.0
+   ```
+8. Log in with the admin credentials you set above, then add Prometheus as a data source:
+   - Go to **Connections** → **Data sources** → **Add data source** → **Prometheus**.
+   - Set the URL to `http://prometheus-svc:9090`.
+   - Click **Save & Test**.
+9. Send a few prediction requests through the YoloFrontend and explore the YoloService metrics in Grafana's **Explore** panel.
 
-In this exercise, you will integrate [Redis](https://redis.io/) into your Netflix service to cache users session data. 
-Storing user session data on the server side is useful because it allows to keep sensitive information away from the client, reducing the risk of tampering. 
-Additionally, it allows for better scalability and consistency, as session data can be centrally managed in a Redis database, and quickly accessed by different instances of the NetflixFrontend service. 
-
-1. Deploy a [redis](https://hub.docker.com/_/redis) as a `Deployment` (together with the corresponding `Service`) in your cluster. The container is listening on port `6379`. 
-2. The [NetflixFrontend][NetflixFrontend] app should be provided with an environment variable called `REDIS_URL` to start storing session data in your redis deployment (e.g. `my-redis:6379`).  
-
-
-### :pencil2: Grafana and Redis integration
-
-In this exercise you deploy a [Grafana](https://grafana.com/) server with [Redis integration](https://grafana.com/grafana/plugins/redis-datasource/) that present information about your Redis database.  
-
-1. Create a grafana Deployment based on [`grafana/grafana`](https://hub.docker.com/r/grafana/grafana) docker image, as follows:
-  - The Deployment should set the following environment variables:
-    - `GF_AUTH_BASIC_ENABLED` with a value equals to `true`.
-    - `GF_SECURITY_ADMIN_USER` and `GF_SECURITY_ADMIN_PASSWORD` variables, to your choice.
-    - `GF_INSTALL_PLUGINS` with the value `redis-datasource`. This variable pass the plugins you want to install when the container is being launched.
-2. Visit the server (you can forward it using the `kubectl port-forward` command).
-3. Configure the Redis datasource [as described here](https://redisgrafana.github.io/redis-datasource/configuration/).  
-4. In the **Redis** data source page, click on the **Dashboards** tab, and import the `Redis` dashboard. Take a look on the imported dashboard.   
-
-[NetflixMovieCatalog]: https://github.com/exit-zero-academy/NetflixMovieCatalog.git
-[NetflixFrontend]: https://github.com/exit-zero-academy/NetflixFrontend.git
 [k8s_core_objects]:  https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/k8s_core_objects.png
-[k8s_netflix_simple]: https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/k8s_netflix_simple.png
