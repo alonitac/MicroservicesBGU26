@@ -1,0 +1,288 @@
+# Intro to Kubernetes 
+
+In this section you'll provision a Kubernetes cluster consists by **one control plane node** and **one worker node**.
+Although AWS offers EKS, a managed service that simplifies cluster setup and management, we will manually set up the cluster using `kubeadm`.
+This hands-on approach will allow you to gain a deeper understanding of Kubernetes architecture and the processes involved in cluster creation and configuration. 
+
+The underlying nodes infrastructure are based on **Ubuntu EC2 instances**. Let's get started. 
+
+## Kubernetes Architecture 
+
+A Kubernetes cluster consists of a set of worker machines, called **nodes**, that run containerized applications (known as **Pods**).
+Every cluster has at least one **worker node** and one **control plane node**.
+
+The control plane manages the worker nodes and the Pods in the cluster.
+In production environments, the control plane usually runs across multiple computers and a cluster usually runs multiple nodes, providing fault-tolerance and high availability.
+
+![][k8s_components]
+
+#### Control Plane main components
+
+The control plane's components make global decisions about the cluster (for example, scheduling), as well as detecting and responding to cluster events (for example, starting up a new pod when a deployment's replicas field is unsatisfied).
+
+- **kube-apiserver**: The API server is the front end for the Kubernetes control plane.
+- **etcd**: Consistent and highly-available key value store used as Kubernetes' backing store for all cluster data.
+- **kube-scheduler**: Watches for newly created Pods with no assigned node, and selects a node for them to run on.
+- **kube-controller-manager**: Runs [controllers](https://kubernetes.io/docs/concepts/overview/components/#kube-controller-manager). There are many different types of controllers. Some examples of them are:
+  - Responsible for noticing and responding when nodes go down.
+  - Responsible for noticing and responding when a Deployment is not in its desired state.
+
+#### Node components
+
+Node components run on every node, maintaining running pods and providing the Kubernetes runtime environment.
+
+- **kubelet**: An agent that runs on each node in the cluster. It makes sure that containers are running in a Pod.
+- **kube-proxy**: kube-proxy is a network proxy that runs on each node in your cluster. It allows network communication to your Pods from network sessions inside or outside your cluster.
+- **Container runtime**: It is responsible for managing the execution and lifecycle of containers ([containerd](https://containerd.io/) or [CRI-O](https://cri-o.io/)).
+
+## Provision 2 nodes Kubernetes cluster in AWS using kubeadm
+
+### Prepare infrastructure 
+
+use this role (created by me + explain the role) - `kubeadm-cluster-node-role`. 
+
+2. Launch two `t2` or `t3.medium` Ubuntu instances with `30GB` disk, naming them `<your-name>-control-plane` and `<your-name>-worker`.
+3. Execute the below script **in both machines**. 
+
+```bash
+# These instructions are for Kubernetes v1.32.
+KUBERNETES_VERSION=v1.32
+
+sudo apt-get update
+sudo apt-get install jq unzip ebtables ethtool -y
+
+# install awscli
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Enable IPv4 packet forwarding. sysctl params required by setup, params persist across reboots
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.ipv4.ip_forward = 1
+EOF
+
+# Apply sysctl params without reboot
+sudo sysctl --system
+
+# Install cri-o kubelet kubeadm kubectl
+curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | sudo tee /etc/apt/sources.list.d/cri-o.list
+
+sudo apt-get update
+sudo apt-get install -y software-properties-common apt-transport-https ca-certificates curl gpg
+sudo apt-get install -y cri-o kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+# start the CRIO container runtime and kubelet
+sudo systemctl start crio.service
+sudo systemctl enable --now crio.service
+sudo systemctl enable --now kubelet
+
+# disable swap memory
+swapoff -a
+
+# add the command to crontab to make it persistent across reboots
+(crontab -l ; echo "@reboot /sbin/swapoff -a") | crontab -
+```
+
+The script essentially installs: 
+
+- `kubeadm` - the [official Kubernetes tool](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) that initializes the cluster and make it up and running.
+- `kubelet` - a Linux service that runs on each node in the cluster, responsible for Pods lifecycle.
+- `cri-o` as the container runtime.
+- `kubectl` - to control the cluster.
+
+> [!WARNING]
+> In this cluster we don't use Docker as the **container runtime** (i.e. the engine that responsible to run your containers).
+> We do this because Docker itself is not implementing the [Container Runtime Interface (CRI)](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/container-runtime-interface.md) required by Kubernetes. Using Docker would require an additional adapter to be installed. 
+> 
+> To avoid this headache, we use [CRI-O](https://github.com/cri-o/cri-o), which is another great container runtime.
+> 
+> This should not affect the operation of your Kubernetes cluster in any way.
+> Anyway, do not install Docker, as it may cause conflicts with the setup.
+
+
+### Initialize the cluster 
+
+1. From the **control-plane node**, initialize the cluster by:
+
+```bash
+sudo kubeadm init
+```
+
+2. **Carefully** read the output to understand how to start using your cluster, and how to join the worker node to be part of the cluster. 
+
+
+   The `kubeadm init` command essentially does the below:
+   
+   1. Runs pre-flight checks.
+   2. Creates certificates that used by different components for secure communication.
+   3. Generates `kubeconfig` files for cluster administration.
+   4. Deploys the `etcd` db as a Pod.
+   5. Deploys the control plane components as Pods (`apiserver`, `controller-manager`, `scheduler`).
+   6. Starts the `kubelet` as a Linux service.
+   7. Install addons in the cluster (`coredns` and `kube-proxy`).
+
+   ![][k8s_architecture_kubeadm]
+
+   Make sure you understand the [role of each component in the architecture](https://kubernetes.io/docs/concepts/architecture/).
+
+
+
+> [!NOTE]
+> - To run `kubeadm init` again, you must first [tear down the cluster](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#tear-down).
+> - The join token is valid for 24 hours. Read here [how to generate a new one](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#join-nodes) if needed.
+> - For more information about initializing a cluster using `kubeadm`, [read the official docs](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/). 
+
+3. Make sure you have two (not yer ready) nodes cluster by executing from the control-plane machine:
+
+```bash
+kubectl get nodes
+```
+
+### Install Pod networking plugin
+
+When deploying a Kubernetes cluster, there are 2 layers of networking communication:
+
+![][k8s_cni]
+
+- Communication between Nodes (denoted by the green line). This is managed for us by the AWS VPC.
+- Communication between Pods (denoted by the purple line). Although the communication is done on top of the VPC, communication between pods using their own cluster-internal IP address is **not** implemented for us by AWS.   
+
+You must deploy a [Container Network Interface (CNI)](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/) network add-on so that your Pods can communicate with each other. 
+There are many [addons that implement the CNI](https://kubernetes.io/docs/concepts/cluster-administration/addons/#networking-and-network-policy). 
+
+We'll install [Calico](https://docs.tigera.io/calico/latest/about/), simply by:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico.yaml
+```
+
+Make sure you have nodes are ready:
+
+```bash
+kubectl get nodes
+```
+
+
+## Deploy application in the cluster
+
+Let's see Kubernetes cluster in all his glory! 
+
+**Online Boutique** is a microservices demo application, consists of an 11-tier microservices.
+The application is a web-based e-commerce app where users can browse items, add them to the cart, and purchase them.
+
+Here is the app architecture and description of each microservice:
+
+![k8s_online-boutique-arch][k8s_online-boutique-arch]
+
+
+| Service                                              | Language      | Description                                                                                                                       |
+| ---------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| frontend                           | Go            | Exposes an HTTP server to serve the website. Does not require signup/login and generates session IDs for all users automatically. |
+| cartservice                     | C#            | Stores the items in the user's shopping cart in Redis and retrieves it.                                                           |
+| productcatalogservice | Go            | Provides the list of products from a JSON file and ability to search products and get individual products.                        |
+| currencyservice             | Node.js       | Converts one money amount to another currency. Uses real values fetched from European Central Bank. It's the highest QPS service. |
+| paymentservice               | Node.js       | Charges the given credit card info (mock) with the given amount and returns a transaction ID.                                     |
+| shippingservice             | Go            | Gives shipping cost estimates based on the shopping cart. Ships items to the given address (mock)                                 |
+| emailservice                   | Python        | Sends users an order confirmation email (mock).                                                                                   |
+| checkoutservice             | Go            | Retrieves user cart, prepares order and orchestrates the payment, shipping and the email notification.                            |
+| recommendationservice | Python        | Recommends other products based on what's given in the cart.                                                                      |
+| adservice                         | Java          | Provides text ads based on given context words.                                                                                   |
+| loadgenerator                 | Python/Locust | Continuously sends requests imitating realistic user shopping flows to the frontend.                                              |
+
+
+To deploy the app in you cluster, perform the below command from the root directory of our course repo (make sure the YAML file exists): 
+
+```bash 
+kubectl apply -f k8s/release-0.8.0.yaml
+```
+
+By default, **applications running within the cluster are not accessible from outside the cluster.**
+There are various techniques available to enable external access, we will cover some of them later on.
+
+Using **port forwarding** allows developers to establish a temporary tunnel for debugging purposes and access applications running inside the cluster from their local machines.
+
+```bash
+kubectl port-forward svc/frontend 8080:80 --address 0.0.0.0
+```
+
+Visit the service in http://<control-plane-public-ip>:8080
+
+## Pods and namespaces
+
+
+Pods are the smallest deployable units of computing that you can create and manage in Kubernetes.
+A Pod is a group of **one or more containers**, with **shared storage** and **network resources**, and a specification for how to run the containers.
+
+You can list the Online Boutique pods by:
+
+```bash
+kubectl get pods
+```
+
+Make sure all pods are `Running`. 
+
+Pods and other resources are aggrandized in **namespaces**.
+Namespace isolates resources within a cluster, usually for better organization and access control.
+
+If you don't specify namespace, the `default` namespace is used. To list pods from all namespaces:
+
+```bash
+kubectl get pods -A
+```
+
+# Exercises 
+
+> [!TIP]
+> ### `kubectl` quick reference
+> 
+> | Description                                | Examples                                                |
+> |--------------------------------------------|---------------------------------------------------------|
+> | List cluster objects - basic information   | `kubectl get pods`, `kubectl get nodes`                 |
+> | List cluster objects - from all namespaces | `kubectl get pods -A`.                                  |
+> | List cluster objects - certain namespace   | `kubectl get pods -n kube-system`.                      |
+> | List cluster objects - wider information   | `kubectl get pods -o wide`, `kubectl get nodes -o wide` |
+> | Get full description of an object          | `kubectl describe pod POD_NAME`                         |
+> | Apply a YAML manifest                      | `kubectl apply -f my-manifest.yaml`.                    |
+> | Apply all manifests in a given dir         | `kubectl apply -f dir/`.                                |
+> | Delete an applied manifest                 | `kubectl delete -f my-manifest.yaml`                    |
+> | Watch pod logs                             | `kubectl logs my-pod`                                   |
+
+
+### :pencil2: Using `kubectl`
+
+Use `kubectl` to answer the following questions: 
+
+1. How many pod replicas does the **frontend** microservice have? 
+2. How many **containers** does a **frontend** pod have? 
+3. Use the `kubectl describe` command to get the IP address of the **frontend** pod. 
+4. For the single **frontend** running pod, how many environment variables does a container named `server` have? 
+5. For the single **frontend** running pod, what is the Docker image the container named `server` based on? 
+6. What is the node name that the **emailservice** pod was scheduled on (by the k8s scheduler)?
+7. What is the port do the **checkoutservice** pods listend on? 
+
+
+### :pencil2: Pod troubleshoot I
+
+Apply the `k8s/customers-db.yaml` to deploy a MySQL pod in the cluster.
+
+1. When a pod is in `Pending` status, one of the first places for debugging is the pod's events. Use the `kubectl describe` to investigate the root cause for the `Pending` status of the `customers` pod.
+2. Use the `kubectl describe node YOUR_NODE_NAME` to get information about the current available capacity in the node (you can also get the same information from your node's **Node details** page in the GCP console), use your common sense to modify the YAML manifest so the customers-db pod can run in the cluster. 
+3. When a pod is in `CrashLoopBackOff` status, the pod's containers were started successfully, but crashed due to internal error. 
+   One of the first places for debugging in the pod's logs. Print the pod's log to address the issue. 
+4. Inspired by the `k8s/release-0.8.0.yaml` YAML manifest, try to add the required env var to the `k8s/customers-db.yaml` manifest to make the MySQL pod running. 
+
+
+Use the `kubectl delete` command to cleanup your cluster from the resources of the `k8s/customers-db.yaml` and `k8s/release-0.8.0.yaml` manifests.
+
+[k8s_architecture_kubeadm]: https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/k8s_architecture_kubeadm.png
+[k8s_cni]: https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/k8s_cni.png
+
+
+
+[k8s_components]: https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/k8s_components.png
+[k8s_online-boutique-arch]: https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/k8s_online-boutique-arch.png
