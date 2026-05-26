@@ -1,16 +1,6 @@
 # Intro to Kubernetes 
 
 
-
-TODO
-
-- comment on prepared role 
-- add details to launch the ubuntu instance with configuring the role, and security group (prepare one). 
-- test that 2 clusters can be up and running in parallel
-- test online boutique works. 
-
-
-
 In this section you'll provision a Kubernetes cluster consists by **one control plane node** and **one worker node**.
 Although AWS offers EKS, a managed service that simplifies cluster setup and management, we will manually set up the cluster using `kubeadm`.
 This hands-on approach will allow you to gain a deeper understanding of Kubernetes architecture and the processes involved in cluster creation and configuration. 
@@ -50,12 +40,39 @@ Node components run on every node, maintaining running pods and providing the Ku
 
 ### Prepare infrastructure 
 
-use this role (created by me + explain the role) - `kubeadm-cluster-node-role`. 
 
-2. Launch two `t2` or `t3.medium` Ubuntu instances with `30GB` disk, naming them `<your-name>-control-plane` and `<your-name>-worker`.
+
+2. Launch two `t2` or `t3.medium` Ubuntu instances with `30GB` disk, naming them `<your-name>-control-plane` and `<your-name>-worker`. Make sure to attach the `kubeadm-cluster-node-role` role to both instances, and the `kubeadm-cluster-node-sg` security group.
+
+   <details>
+   <summary>Step-by-step: launching an EC2 instance</summary>
+
+   Repeat these steps twice - once for the control plane node, once for the worker node.
+
+   1. Open the Amazon EC2 console at [https://console.aws.amazon.com/ec2/](https://console.aws.amazon.com/ec2/).
+   2. Choose **Launch instance**.
+   3. Under **Name and tags**, enter `<your-name>-control-plane` (or `<your-name>-worker` for the second instance).
+   4. Under **Application and OS Images**, choose **Quick Start** → **Ubuntu**.
+   5. Under **Instance type**, select `t3.medium` (or `t2.medium` if unavailable in your region).
+   6. Under **Key pair (login)**, select your existing `.pem` key pair from the dropdown.
+   7. Under **Network settings**, click **Edit**:
+      - **VPC**: choose the default VPC.
+      - **Subnet**: choose any available subnet.
+      - **Firewall (security groups)**: choose **Select existing security group** and select `kubeadm-cluster-node-sg` (this is a dedicated security group for the Kubernetes cluster nodes we created earlier).
+   8. Under **Advanced details** → **IAM instance profile**, select `kubeadm-cluster-node-role` (this is a dedicated IAM role for the Kubernetes cluster nodes we created earlier. It allows the cluster nodes to interact with AWS services securely).
+   9. Under **Configure storage**, set the root volume to **30 GiB**.
+   10. Review the **Summary** panel and click **Launch instance**.
+
+   Once both instances are running, connect to each one:
+
+   ```bash
+   ssh -i "</path/to/key.pem>" ubuntu@<instance-public-ip>
+   ```
+
+   </details>
 3. SSH into each instance and execute the below script **in both machines** as root. 
 
-First switch to rooll user by 
+First switch to root user by 
 
 ```bash
 sudo su -
@@ -124,7 +141,7 @@ echo "Setup completed at $(date)" | tee /var/log/k8s-setup-complete
 ```
 
 > [!TIP]
-> Create AMI fo further instances, or use prepared AMI: ...
+> 
 
 
 
@@ -150,8 +167,9 @@ The script essentially installs:
 1. From the **control-plane node**, initialize the cluster by:
 
 ```bash
-sudo kubeadm init
+sudo kubeadm init --cri-socket unix:///var/run/crio/crio.sock
 ```
+
 
 2. **Carefully** read the output to understand how to start using your cluster, and how to join the worker node to be part of the cluster. 
 
@@ -245,7 +263,7 @@ Here is the app architecture and description of each microservice:
 To deploy the app in you cluster, perform the below command from the root directory of our course repo (make sure the YAML file exists): 
 
 ```bash 
-kubectl apply -f k8s/release-0.8.0.yaml
+kubectl apply -f k8s/online-boutique.yaml
 ```
 
 By default, **applications running within the cluster are not accessible from outside the cluster.**
@@ -258,6 +276,12 @@ kubectl port-forward svc/frontend 8080:80 --address 0.0.0.0
 ```
 
 Visit the service in http://<control-plane-public-ip>:8080
+
+To delete the app from the cluster:
+
+```bash
+kubectl delete -f k8s/online-boutique.yaml
+```
 
 ## Pods and namespaces
 
@@ -313,18 +337,72 @@ Use `kubectl` to answer the following questions:
 7. What is the port do the **checkoutservice** pods listend on? 
 
 
-### :pencil2: Pod troubleshoot I
+### :pencil2: Expand the cluster
 
-Apply the `k8s/customers-db.yaml` to deploy a MySQL pod in the cluster.
+In this exercise you will grow your cluster by adding a second worker node and a second control plane node, simulating a production-grade, highly-available setup.
 
-1. When a pod is in `Pending` status, one of the first places for debugging is the pod's events. Use the `kubectl describe` to investigate the root cause for the `Pending` status of the `customers` pod.
-2. Use the `kubectl describe node YOUR_NODE_NAME` to get information about the current available capacity in the node (you can also get the same information from your node's **Node details** page in the GCP console), use your common sense to modify the YAML manifest so the customers-db pod can run in the cluster. 
-3. When a pod is in `CrashLoopBackOff` status, the pod's containers were started successfully, but crashed due to internal error. 
-   One of the first places for debugging in the pod's logs. Print the pod's log to address the issue. 
-4. Inspired by the `k8s/release-0.8.0.yaml` YAML manifest, try to add the required env var to the `k8s/customers-db.yaml` manifest to make the MySQL pod running. 
+> [!TIP]
+> To save time, use the prepared AMI `kubeadm-cluster-node-base-img` when launching new instances - it already has `kubeadm`, `kubelet`, `kubectl`, and `cri-o` installed from the setup script above. You only need to launch the instance and run the join command.
+
+#### Add a second worker node
+
+1. Launch a new `t3.medium` Ubuntu instance from the prepared AMI, naming it `<your-name>-worker-2`. Attach the `kubeadm-cluster-node-role` IAM role and the `kubeadm-cluster-node-sg` security group, with a `30 GiB` root volume.
+
+2. On the **control plane node**, generate a fresh join command (valid for 24 hours):
+   ```bash
+   kubeadm token create --print-join-command
+   ```
+
+3. SSH into `worker-2` and run the printed `kubeadm join ...` command as root, adding the `--cri-socket` flag:
+   ```bash
+   sudo <paste the join command here> --cri-socket unix:///var/run/crio/crio.sock
+   ```
+
+4. Back on the control plane, confirm the new node appears and eventually reaches `Ready`:
+   ```bash
+   kubectl get nodes -o wide
+   ```
 
 
-Use the `kubectl delete` command to cleanup your cluster from the resources of the `k8s/customers-db.yaml` and `k8s/release-0.8.0.yaml` manifests.
+#### Add a second control plane node
+
+A single control plane is a single point of failure - if it goes down, the entire cluster API becomes unreachable.
+Adding a second control plane node makes the cluster highly available.
+
+1. Launch another `t3.medium` Ubuntu instance from the prepared AMI, naming it `<your-name>-control-plane-2`. Attach the same IAM role and security group as above.
+
+2. On the **existing control plane**, upload the certificates so the new control plane node can share them, and generate a join command with the `--control-plane` flag:
+   ```bash
+   sudo kubeadm init phase upload-certs --upload-certs
+   ```
+   This prints a `--certificate-key`. Use it together with the regular join command:
+   ```bash
+   kubeadm token create --print-join-command
+   ```
+
+
+3. SSH into `control-plane-2` and run the combined join command as root: 
+
+ ```bash
+   sudo <join command> --control-plane --certificate-key <certificate-key> --cri-socket unix:///var/run/crio/crio.sock
+   ```
+
+4. Once it completes, set up `kubectl` on the new node as well:
+   ```bash
+   mkdir -p $HOME/.kube
+   sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+   sudo chown $(id -u):$(id -g) $HOME/.kube/config
+   ```
+
+5. From either control plane node, verify all nodes are present:
+   ```bash
+   kubectl get nodes -o wide
+   ```
+   Both control plane nodes should show the `control-plane` role.
+
+6. Stop (do **not** terminate) your original control plane instance from the AWS console. Can you still run `kubectl` commands from `control-plane-2`? What does this tell you about HA control planes?
+
+
 
 [k8s_architecture_kubeadm]: https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/k8s_architecture_kubeadm.png
 [k8s_cni]: https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/k8s_cni.png
