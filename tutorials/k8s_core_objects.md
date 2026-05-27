@@ -426,7 +426,7 @@ The `kube-proxy` (running in every node) ensures that connections to the service
 Let's use the `kubectl run` command to create a **temporary** pod name `busybox-client` (based on the useful [`busybox` docker image](https://hub.docker.com/_/busybox)) that will communicate with our YoloService: 
 
 ```bash
-kubectl run busybox-client --rm --image=docker.io/busybox --restart=Never -- sh -c 'while true; do wget -qO- http://yolo-svc:8080; sleep 5; done'
+kubectl run busybox-client --rm --image=docker.io/busybox --restart=Never -- sh -c 'while true; do wget -qO- http://yolo-svc:8080/health; sleep 5; done'
 ```
 
 ### Service DNS 
@@ -435,7 +435,7 @@ Kubernetes is shipped with an internal DNS server, called [CoreDNS](https://core
 The CoreDNS server is running as a Pod in the `kube-system` namespace. 
 It watches the Kubernetes API for new Services and creates a set of DNS records for each one.
 
-Instead of accessing your service by its IP address, you can simply use the Service name as the domain name:
+Instead of accessing your service by its IP address, you can simply use the Service name as the domain name (to be running from one of the cluster nodes or from a Pod running in the cluster):
 
 ```bash 
 curl yolo-svc:8080
