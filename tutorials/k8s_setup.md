@@ -140,10 +140,6 @@ swapoff -a
 echo "Setup completed at $(date)" | tee /var/log/k8s-setup-complete
 ```
 
-> [!TIP]
-> 
-
-
 
 The script essentially installs: 
 
@@ -189,7 +185,7 @@ sudo kubeadm init --cri-socket unix:///var/run/crio/crio.sock
    Make sure you understand the [role of each component in the architecture](https://kubernetes.io/docs/concepts/architecture/).
 
 
-3. Set `kubectl`: 
+3. `kubectl` is the command-line tool for controlling Kubernetes clusters. To start using it:
 
 ```bash
 mkdir -p $HOME/.kube
@@ -197,10 +193,18 @@ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 ```
 
+
+
+
 > [!NOTE]
+> - When running the `kubeadm join` command on the worker node, you may need to append the `--cri-socket` flag, just as you did with `kubeadm init`:
+>   ```bash
+>   sudo <join command> --cri-socket unix:///var/run/crio/crio.sock
+>   ```
 > - To run `kubeadm init` again, you must first [tear down the cluster](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#tear-down).
 > - The join token is valid for 24 hours. Read here [how to generate a new one](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#join-nodes) if needed.
-> - For more information about initializing a cluster using `kubeadm`, [read the official docs](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/). 
+> - For more information about initializing a cluster using `kubeadm`, [read the official docs](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/).
+
 
 3. Make sure you have two (not yer ready) nodes cluster by executing from the control-plane machine:
 
@@ -260,10 +264,10 @@ Here is the app architecture and description of each microservice:
 | loadgenerator                 | Python/Locust | Continuously sends requests imitating realistic user shopping flows to the frontend.                                              |
 
 
-To deploy the app in you cluster, perform the below command from the root directory of our course repo (make sure the YAML file exists): 
+To deploy the app in you cluster, perform the below command: 
 
 ```bash 
-kubectl apply -f k8s/online-boutique.yaml
+kubectl apply -f https://raw.githubusercontent.com/alonitac/MicroservicesBGU26/main/k8s/online-boutique.yaml
 ```
 
 By default, **applications running within the cluster are not accessible from outside the cluster.**
@@ -275,12 +279,12 @@ Using **port forwarding** allows developers to establish a temporary tunnel for 
 kubectl port-forward svc/frontend 8080:80 --address 0.0.0.0
 ```
 
-Visit the service in http://<control-plane-public-ip>:8080
+Visit the service in `http://<control-plane-public-ip>:8080`
 
 To delete the app from the cluster:
 
 ```bash
-kubectl delete -f k8s/online-boutique.yaml
+kubectl delete -f https://raw.githubusercontent.com/alonitac/MicroservicesBGU26/main/k8s/online-boutique.yaml
 ```
 
 ## Pods and namespaces
@@ -335,72 +339,6 @@ Use `kubectl` to answer the following questions:
 5. For the single **frontend** running pod, what is the Docker image the container named `server` based on? 
 6. What is the node name that the **emailservice** pod was scheduled on (by the k8s scheduler)?
 7. What is the port do the **checkoutservice** pods listend on? 
-
-
-### :pencil2: Expand the cluster
-
-In this exercise you will grow your cluster by adding a second worker node and a second control plane node, simulating a production-grade, highly-available setup.
-
-> [!TIP]
-> To save time, use the prepared AMI `kubeadm-cluster-node-base-img` when launching new instances - it already has `kubeadm`, `kubelet`, `kubectl`, and `cri-o` installed from the setup script above. You only need to launch the instance and run the join command.
-
-#### Add a second worker node
-
-1. Launch a new `t3.medium` Ubuntu instance from the prepared AMI, naming it `<your-name>-worker-2`. Attach the `kubeadm-cluster-node-role` IAM role and the `kubeadm-cluster-node-sg` security group, with a `30 GiB` root volume.
-
-2. On the **control plane node**, generate a fresh join command (valid for 24 hours):
-   ```bash
-   kubeadm token create --print-join-command
-   ```
-
-3. SSH into `worker-2` and run the printed `kubeadm join ...` command as root, adding the `--cri-socket` flag:
-   ```bash
-   sudo <paste the join command here> --cri-socket unix:///var/run/crio/crio.sock
-   ```
-
-4. Back on the control plane, confirm the new node appears and eventually reaches `Ready`:
-   ```bash
-   kubectl get nodes -o wide
-   ```
-
-
-#### Add a second control plane node
-
-A single control plane is a single point of failure - if it goes down, the entire cluster API becomes unreachable.
-Adding a second control plane node makes the cluster highly available.
-
-1. Launch another `t3.medium` Ubuntu instance from the prepared AMI, naming it `<your-name>-control-plane-2`. Attach the same IAM role and security group as above.
-
-2. On the **existing control plane**, upload the certificates so the new control plane node can share them, and generate a join command with the `--control-plane` flag:
-   ```bash
-   sudo kubeadm init phase upload-certs --upload-certs
-   ```
-   This prints a `--certificate-key`. Use it together with the regular join command:
-   ```bash
-   kubeadm token create --print-join-command
-   ```
-
-
-3. SSH into `control-plane-2` and run the combined join command as root: 
-
- ```bash
-   sudo <join command> --control-plane --certificate-key <certificate-key> --cri-socket unix:///var/run/crio/crio.sock
-   ```
-
-4. Once it completes, set up `kubectl` on the new node as well:
-   ```bash
-   mkdir -p $HOME/.kube
-   sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-   sudo chown $(id -u):$(id -g) $HOME/.kube/config
-   ```
-
-5. From either control plane node, verify all nodes are present:
-   ```bash
-   kubectl get nodes -o wide
-   ```
-   Both control plane nodes should show the `control-plane` role.
-
-6. Stop (do **not** terminate) your original control plane instance from the AWS console. Can you still run `kubectl` commands from `control-plane-2`? What does this tell you about HA control planes?
 
 
 
