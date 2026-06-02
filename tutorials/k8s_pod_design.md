@@ -49,10 +49,6 @@ spec:
     targetPort: 8080
 ```
 
-## Describe Pod
-
-The `kubectl describe` command displays a comprehensive set of information about pods. 
-This command is very useful for diagnosing issues, understanding the current [state of a pod](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase) and [containers](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-states), and gathering information for debugging purposes, [Pod conditions](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions), Volumes, Network and Events.
 
 ## Resource management for Pods and containers
 
@@ -214,7 +210,7 @@ A **probe** is a diagnostic performed periodically by the **kubelet** on a conta
 
 ### Define a Liveness probe
 
-The YoloService exposes a root endpoint `/`. Upon an HTTP GET request, if the endpoint returns a `200` status code, it means "the server is alive".
+The YoloService exposes a `/health` endpoint. Upon an HTTP GET request, if the endpoint returns a `200` status code, it means "the server is alive".
 
 In the below example, the `livenessProbe` entry defines a liveness probe for our Pod: 
 
@@ -250,7 +246,7 @@ spec:
         livenessProbe:
           initialDelaySeconds: 10
           httpGet:
-            path: "/"
+            path: "/health"
             port: 8080
 ```
 
@@ -313,28 +309,30 @@ spec:
         livenessProbe:
           initialDelaySeconds: 10
           httpGet:
-            path: "/"
+            path: "/health"
             port: 8080
         readinessProbe:
           initialDelaySeconds: 10
           httpGet:
-            path: "/ready"
+            path: "/health"
             port: 8080
 ```
 
-In the above example, we use the `/ready` endpoint to perform the readiness probe HTTP request.
-Since this endpoint does not exist in the YoloService image by default, the probe will fail at the beginning, and traffic from the Service wouldn't be routed to this Pod. 
+In the above example, we use the `/health` endpoint to perform both the liveness and readiness probe HTTP requests.
+The YoloService exposes this endpoint - when the server is up and ready it returns `200 OK`.
 
-Deploy the above manifest, you'll see that the `yolo-service` Deployment does not complete the rolling update since the new replicaset container is not ready. 
+Deploy the above manifest and observe that the `yolo-service` Deployment completes the rolling update only once the new Pod passes its readiness probe.
 
-To fix this, the `/ready` endpoint must be added to the **application source code** of the YoloService. The endpoint should return a `200` status when the service is ready to handle requests.
-
-For a Python Flask application, this would look like:
+If you want the readiness probe to fail intentionally (e.g. to simulate a not-ready Pod), you can add logic to your `/health` handler that checks an internal **readiness flag** and returns a non-`200` status when the flag is `False`. For a Python Flask application, this would look like:
 
 ```python
-@app.route('/ready')
-def ready():
-    return 'Ready', 200
+is_ready = True
+
+@app.route('/health')
+def health():
+    if not is_ready:
+        return 'Not ready', 503
+    return 'OK', 200
 ```
 
 Once you rebuild the image with this change and update the Deployment to use the new image, the readiness probe will pass and traffic will be routed to the Pod.
@@ -388,12 +386,12 @@ spec:
         livenessProbe:
           initialDelaySeconds: 10
           httpGet:
-            path: "/"
+            path: "/health"
             port: 8080
         readinessProbe:
           initialDelaySeconds: 10
           httpGet:
-            path: "/"
+            path: "/health"
             port: 8080
 ```
 
@@ -478,12 +476,12 @@ spec:
         livenessProbe:
           initialDelaySeconds: 10
           httpGet:
-            path: "/"
+            path: "/health"
             port: 8080
         readinessProbe:
           initialDelaySeconds: 10
           httpGet:
-            path: "/"
+            path: "/health"
             port: 8080
 ```
 
