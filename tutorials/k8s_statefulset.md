@@ -259,7 +259,7 @@ Follow the same steps as for Prometheus:
 
 Verify that your Grafana dashboards and data sources survive a Pod deletion.
 
-### :pencil2: Dynamic volume provisioning
+### :pencil2: (optional) Dynamic volume provisioning
 
 In the previous steps you created the EBS volume manually and referenced it in a PV.
 Kubernetes also supports **dynamic provisioning**: you only create a PVC, and the EBS CSI driver automatically creates both the EBS volume in AWS and the corresponding PV object — no manual `aws ec2 create-volume` needed.
@@ -273,7 +273,7 @@ Repeat the Grafana exercise above using dynamic provisioning:
 > [!NOTE]
 > Because the `ebs-sc` StorageClass uses `volumeBindingMode: WaitForFirstConsumer`, the PVC stays in `Pending` until a Pod that uses it is scheduled. At that point the EBS volume is created in the same Availability Zone as the node.
 
-### :pencil2: Increase volume capacity
+### :pencil2: (optional) Increase volume capacity
 
 Assume the Prometheus volume is running low on disk space. This exercise guides you through properly resizing a Kubernetes volume.
 

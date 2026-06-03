@@ -499,7 +499,7 @@ Define a `livenessProbe` and a `readinessProbe` for the following services in yo
 
 
 
-### :pencil2: Zero downtime during scale
+### :pencil2: (optional) Zero downtime during scale
 
 Your goal in this exercise is to achieve zero downtime during **manual** scale up/down events of the **YoloFrontend** service.
 
