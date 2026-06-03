@@ -104,7 +104,7 @@ Read the instructions **carefully** and follow them step by step.
 
 <tr>
  <td>7</td>
- <td>Containers</td>
+ <td>Orchestration</td>
  <td><a href="tutorials/k8s_setup.md">Kubernetes setup and intro</a></td>
  <td></td>
  <td></td>
@@ -115,11 +115,41 @@ Read the instructions **carefully** and follow them step by step.
 
 <tr>
  <td>8</td>
- <td>Containers</td>
+ <td>Orchestration</td>
  <td><a href="tutorials/k8s_core_objects.md">Kubernetes core objects</a></td>
  <td></td>
  <td></td>
  <td><a href="tutorials/k8s_core_objects.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
+ <td></td>
+</tr>	
+
+<tr>
+ <td>9</td>
+ <td>Orchestration</td>
+ <td><a href="tutorials/k8s_pod_design.md">Kubernetes Pod Design</a></td>
+ <td></td>
+ <td></td>
+ <td><a href="tutorials/k8s_pod_design.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
+ <td></td>
+</tr>	
+
+<tr>
+ <td>10</td>
+ <td>Orchestration</td>
+ <td><a href="tutorials/k8s_statefulset.md">Kubernetes StatefulSets</a></td>
+ <td></td>
+ <td></td>
+ <td><a href="tutorials/k8s_statefulset.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
+ <td></td>
+</tr>	
+
+<tr>
+ <td>11</td>
+ <td>Orchestration</td>
+ <td><a href="tutorials/k8s_helm.md">Helm</a></td>
+ <td></td>
+ <td></td>
+ <td><a href="tutorials/k8s_helm.md#exercises"><img src="https://exit-zero-academy.github.io/DevOpsTheHardWayAssets/img/pen.png" /></a></td>
  <td></td>
 </tr>	
 
