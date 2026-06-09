@@ -130,18 +130,26 @@ This field is used to link the Kubernetes node object to the corresponding EC2 i
 If you created your cluster using `kubeadm`, this field is not populated by default.
 To set it, run the following command for each node in your cluster.
 
-List nodes:
+Run the following script from the control plane. It uses the AWS CLI to look up each node's instance ID and AZ by its private IP:
 
 ```bash
-kubectl get nodes
+rm -f /usr/local/bin/aws
+hash -r
+sudo snap install aws-cli --classic
+
+for NODE in $(kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name,IP:.status.addresses[0].address | awk '{print $1}'); do
+  IP=$(kubectl get node $NODE -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+  INSTANCE=$(aws ec2 describe-instances \
+    --filters "Name=private-ip-address,Values=$IP" \
+    --query "Reservations[0].Instances[0].InstanceId" --output text)
+  AZ=$(aws ec2 describe-instances \
+    --filters "Name=private-ip-address,Values=$IP" \
+    --query "Reservations[0].Instances[0].Placement.AvailabilityZone" --output text)
+  kubectl patch node $NODE -p "{\"spec\":{\"providerID\":\"aws:///$AZ/$INSTANCE\"}}"
+done
 ```
 
-For each node, run:
 
-```bash
-kubectl patch node <node-name> \
-    -p "{\"spec\":{\"providerID\":\"aws:///<your-instance-az>/<your-instance-id>\"}}"
-```
 
 ### Install the AWS CCM
 
@@ -179,7 +187,7 @@ helm install aws-cloud-controller-manager \
 Verify the CCM pod is running:
 
 ```bash
-kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-cloud-controller-manager
+kubectl get pods -n kube-system -l k8s-app=aws-cloud-controller-manager
 ```
 
 
@@ -248,6 +256,14 @@ helm install ingress-nginx ingress-nginx/ingress-nginx \
 
 ### Expose YoloFrontend via Ingress
 
+You have to know the ELB hostname to set up the Ingress rules, so wait until the `ingress-nginx-controller` service has an external IP:
+
+```bash
+kubectl get svc -n ingress-nginx
+```
+
+Copy the value in the `EXTERNAL-IP` column (e.g. `a1b2c3d4.eu-central-1.elb.amazonaws.com`).
+
 
 Create an Ingress resource that routes all traffic to the frontend:
 
@@ -261,7 +277,8 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - http:
+    - host: <your-load-balancer-hostname>
+      http:
         paths:
           - path: /
             pathType: Prefix
@@ -279,10 +296,16 @@ kubectl get ingress
 
 Open `http://<ingress-nginx-elb-hostname>` - traffic flows through the single shared ELB, through the Nginx Ingress Controller, and into the YoloFrontend.
 
+> [!TIP]
+> `kubectl delete validatingwebhookconfiguration ingress-nginx-admission` if you want to be able to create Ingress resources without the `ingressClassName` field (i.e. default to nginx).
+
+
 ### How Ingress routing works
 
 - **`ingressClassName: nginx`** - tells Kubernetes which Ingress Controller handles this rule. Multiple controllers can coexist in the same cluster; each one only processes Ingress objects that reference its own class.
 - **`rules`** - each rule maps an optional hostname and/or URL path to a backend Service. You can add multiple rules to route different paths or domains to different services without provisioning additional load balancers.
+
+# Exercises 
 
 
 ## :pencil2: (optional) Point a custom domain to your ELB via Route 53
