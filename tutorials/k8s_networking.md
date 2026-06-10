@@ -116,14 +116,6 @@ In the AWS console, add this tag to **both** your control-plane and worker insta
 3. Add the tag with key `kubernetes.io/cluster/<your-name>` and value `owned`.
 4. Repeat the same for your worker node.
 
-The CCM also needs to know which subnets to use when provisioning ELBs.
-Add the same tag to the subnets that your cluster nodes are in:
-
-1. Go to the EC2 console and select your control-plane instance.
-2. Note the **Subnet ID** of the instance (e.g. `subnet-1234abcd`). Click on the subnet ID to open the subnet details page.
-3. Click the **Tags** tab and then **Add/Edit Tags**.
-4. Add the tag with key `kubernetes.io/cluster/<your-name>` and value `shared`.
-5. Repeat the same for the worker node subnet.
 
 Last thing, the CCM needs the `providerID` field to be set on each node object in Kubernetes.
 This field is used to link the Kubernetes node object to the corresponding EC2 instance in AWS.
