@@ -90,10 +90,13 @@ Add the following secrets to your **forked YoloService repo**:
 
 ### Watch the workflow run
 
+**GitHub Actions** is a CI/CD platform built into GitHub. It runs automated workflows defined as YAML files under `.github/workflows/` in your repo. Each workflow is triggered by events (e.g. a push to `main`) and consists of one or more jobs that run in sequence or in parallel on GitHub-hosted runners.
+
+Before triggering the pipeline, take a moment to review the workflow file at `.github/workflows/deploy.yml` in your forked repo. Read through the steps to understand what each job does and how the image tag update is committed back to `infra/k8s/`.
+
 Push any change to the `main` branch of your forked `YoloService` repo to trigger the pipeline.
 
-Go to the **Actions** tab of your forked repo to watch the workflow run in real time:
-- The first job builds and pushes a new Docker image to DockerHub.
-- The second job updates the image tag in `infra/k8s/` and commits the change back to the same repo.
+Go to the **Actions** tab of your forked repo to watch the workflow run in real time.
+.
 
 Once the workflow completes, switch to ArgoCD - it will detect the new commit and automatically roll out the updated image, completing the full GitOps loop.
